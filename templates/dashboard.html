@@ -1,0 +1,152 @@
+{% extends "base.html" %}
+{% block title %}LifeTrace · 概览{% endblock %}
+
+{% block content %}
+<header class="topbar">
+  <div>
+    <h1>概览</h1>
+    <div class="meta">你的个人生活数据实验室</div>
+  </div>
+  <div class="row">
+    {% if anomaly_summary.count > 0 %}
+    <span class="chip" style="color:#b91c1c;border-color:#fecaca;">⚠ 检测到 {{ anomaly_summary.count }} 个异常日</span>
+    {% endif %}
+    <span class="chip">🔥 连续记录 {{ streak }} 天</span>
+  </div>
+</header>
+
+<div class="content">
+  {% if total_records == 0 %}
+    <div class="alert amber">
+      <span class="icon">●</span>
+      <div>还没有任何记录。点击左侧「记录」开始录入今天的数据，或前往「数据」页导入 CSV。</div>
+    </div>
+  {% endif %}
+
+  <!-- Hero -->
+  <section class="hero">
+    <h2>你的生活，正在形成一条可读的时间序列。</h2>
+    <p>LifeTrace 将每天零散的生活数据汇聚成连贯的行为轨迹，用统计方法帮助你理解自己的规律。</p>
+    <div class="stat-row">
+      <div class="stat"><span class="v">{{ total_records }}</span><span class="l">累计记录天数</span></div>
+      <div class="stat"><span class="v">{{ streak }}</span><span class="l">连续记录天数</span></div>
+      <div class="stat"><span class="v">{{ week.avg_mood }}</span><span class="l">本周平均心情</span></div>
+      <div class="stat"><span class="v">{{ week.plan_completion_rate }}%</span><span class="l">本周计划完成率</span></div>
+    </div>
+  </section>
+
+  <!-- KPI cards -->
+  <section class="section">
+    <div class="grid grid-3">
+      <div class="card kpi">
+        <span class="label">本周平均睡眠</span>
+        <span class="value">{{ week.avg_sleep }}<span class="unit">小时</span></span>
+        {% set d = deltas.avg_sleep %}
+        <span class="delta {{ 'up' if d > 0 else ('down' if d < 0 else 'flat') }}">
+          {{ ('+' if d > 0 else '') ~ d }}% 较上周
+        </span>
+      </div>
+      <div class="card kpi">
+        <span class="label">本周平均学习</span>
+        <span class="value">{{ week.avg_study }}<span class="unit">小时</span></span>
+        {% set d = deltas.avg_study %}
+        <span class="delta {{ 'up' if d > 0 else ('down' if d < 0 else 'flat') }}">
+          {{ ('+' if d > 0 else '') ~ d }}% 较上周
+        </span>
+      </div>
+      <div class="card kpi">
+        <span class="label">平均心情（本周）</span>
+        <span class="value">{{ week.avg_mood }}<span class="unit">/ 10</span></span>
+        {% set d = deltas.avg_mood %}
+        <span class="delta {{ 'up' if d > 0 else ('down' if d < 0 else 'flat') }}">
+          {{ ('+' if d > 0 else '') ~ d }}% 较上周
+        </span>
+      </div>
+      <div class="card kpi">
+        <span class="label">运动次数（本月）</span>
+        <span class="value">{{ month.exercise_days }}<span class="unit">次</span></span>
+        <span class="delta flat">日均 {{ month.avg_exercise }} 小时</span>
+      </div>
+      <div class="card kpi">
+        <span class="label">计划完成率（本周）</span>
+        <span class="value">{{ week.plan_completion_rate }}<span class="unit">%</span></span>
+        <span class="delta flat">熬夜率 {{ week.stay_up_rate }}%</span>
+      </div>
+      <div class="card kpi">
+        <span class="label">本月消费</span>
+        <span class="value">{{ '%.0f' | format(month.total_spending) }}<span class="unit">元</span></span>
+        <span class="delta flat">平均压力 {{ month.avg_stress }}/10</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- Trend charts -->
+  <section class="section">
+    <div class="section-head"><h3>趋势</h3><span class="desc">日粒度 · 虚线为 7 日移动平均</span></div>
+    <div class="grid grid-2">
+      <div class="card"><div class="card-title">睡眠趋势</div><div id="chart-sleep" class="chart chart-box"></div></div>
+      <div class="card"><div class="card-title">学习趋势</div><div id="chart-study" class="chart chart-box"></div></div>
+      <div class="card"><div class="card-title">心情趋势</div><div id="chart-mood" class="chart chart-box"></div></div>
+      <div class="card"><div class="card-title">消费趋势</div><div id="chart-spending" class="chart chart-box"></div></div>
+    </div>
+  </section>
+
+  <!-- Correlation + anomaly -->
+  <section class="section">
+    <div class="grid" style="grid-template-columns: 1.15fr 1fr;">
+      <div class="card">
+        <div class="card-title">行为相关性 <span class="sub">Pearson r · 点击进入分析页</span></div>
+        {% for c in correlations %}
+        <a href="/analysis" class="corr-pair" style="margin-bottom:8px;color:inherit;">
+          <span class="names">{{ c.x_label }} × {{ c.y_label }}</span>
+          <span style="display:flex;align-items:center;gap:10px;">
+            <span class="r" style="color:{{ '#10b981' if c.r >= 0 else '#ef4444' }};">{{ '%.2f' | format(c.r) }}</span>
+            <span class="badge {{ 'green' if c.significant else 'gray' }}">{{ '显著' if c.significant else '不显著' }}</span>
+          </span>
+        </a>
+        {% endfor %}
+        <div class="small muted" style="margin-top:8px;">相关不代表因果。系数仅描述历史数据中的共变关系。</div>
+      </div>
+
+      <div class="card">
+        <div class="card-title">数据异常提醒 <span class="sub">Isolation Forest + 统计偏差</span></div>
+        {% if anomaly_summary.recent %}
+          {% for a in anomaly_summary.recent %}
+          <div class="alert red" style="margin-bottom:10px;align-items:flex-start;">
+            <span class="icon">!</span>
+            <div>
+              <strong>{{ a.date }}</strong>
+              {% if a.driver %}<div class="small" style="margin-top:2px;">{{ a.driver.explanation }}</div>{% endif %}
+            </div>
+          </div>
+          {% endfor %}
+        {% else %}
+          <div class="alert green"><span class="icon">✓</span><div>近期未发现明显的异常行为日。</div></div>
+        {% endif %}
+        <a href="/analysis" class="btn sm" style="margin-top:8px;">查看全部分析 →</a>
+      </div>
+    </div>
+  </section>
+
+  <!-- Heatmap -->
+  <section class="section">
+    <div class="card">
+      <div class="card-title">相关性热力图 <span class="sub">所有数值变量两两相关</span></div>
+      <div id="chart-heatmap" class="chart" style="min-height:400px;"></div>
+    </div>
+  </section>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+  window.__CHARTS__ = {
+    sleep: {{ charts.sleep | safe }},
+    study: {{ charts.study | safe }},
+    mood: {{ charts.mood | safe }},
+    spending: {{ charts.spending | safe }},
+    heatmap: {{ charts.heatmap | safe }}
+  };
+  LifeTrace.renderCharts();
+</script>
+{% endblock %}

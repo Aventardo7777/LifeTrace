@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>{% block title %}LifeTrace · 人生轨迹实验室{% endblock %}</title>
+  <link rel="stylesheet" href="/static/css/style.css" />
+  <script src="/static/js/plotly.min.js"></script>
+</head>
+<body>
+  <div class="app">
+    <aside class="sidebar">
+      <div class="brand">
+        <div class="brand-mark">L</div>
+        <div>
+          <div class="brand-name">LifeTrace</div>
+          <div class="brand-sub">人生轨迹实验室</div>
+        </div>
+      </div>
+      <nav class="nav">
+        <a href="/" class="nav-item {{ 'active' if active == 'dashboard' else '' }}">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 3h7v7H3zM14 3h7v7h-7zM3 14h7v7H3zM14 14h7v7h-7z"/></svg>
+          概览
+        </a>
+        <a href="/record" class="nav-item {{ 'active' if active == 'record' else '' }}">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg>
+          记录
+        </a>
+        <a href="/records" class="nav-item {{ 'active' if active == 'records' else '' }}">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"/></svg>
+          记录列表
+        </a>
+        <a href="/analysis" class="nav-item {{ 'active' if active == 'analysis' else '' }}">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 3v18h18M7 15l3-4 4 2 5-7"/></svg>
+          分析
+        </a>
+        <a href="/data" class="nav-item {{ 'active' if active == 'data' else '' }}">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><ellipse cx="12" cy="5" rx="8" ry="3"/><path d="M4 5v14c0 1.7 3.6 3 8 3s8-1.3 8-3V5M4 12c0 1.7 3.6 3 8 3s8-1.3 8-3"/></svg>
+          数据
+        </a>
+      </nav>
+      <div class="sidebar-footer">
+        <strong>本地优先</strong><br />
+        所有数据仅保存在本机 SQLite，不上传云端。
+      </div>
+    </aside>
+
+    <main class="main">
+      {% block content %}{% endblock %}
+      <div class="footer-note">LifeTrace · Personal Life Data Observatory — 数据仅保存在本地</div>
+    </main>
+  </div>
+
+  <script src="/static/js/app.js"></script>
+  {% block scripts %}{% endblock %}
+</body>
+</html>

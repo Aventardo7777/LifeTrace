@@ -1,0 +1,162 @@
+{% extends "base.html" %}
+{% block title %}LifeTrace · 记录{% endblock %}
+
+{% block content %}
+<header class="topbar">
+  <div>
+    <h1>记录</h1>
+    <div class="meta">每天花一分钟，记录你的生活数据</div>
+  </div>
+  <div class="chip">{{ target_date }}</div>
+</header>
+
+<div class="content">
+  <div class="grid" style="grid-template-columns: 1fr 320px;">
+    <form id="record-form" class="card">
+      <div class="card-title">当日数据</div>
+
+      <div class="grid grid-2">
+        <div class="field">
+          <label>睡眠时长 <span class="hint">小时</span></label>
+          <div class="range-wrap">
+            <input type="range" name="sleep_hours" min="0" max="14" step="0.5" value="{{ record.sleep_hours if record else 7.0 }}" data-val />
+            <span class="range-val">{{ record.sleep_hours if record else 7.0 }}</span>
+          </div>
+        </div>
+        <div class="field">
+          <label>学习时长 <span class="hint">小时</span></label>
+          <div class="range-wrap">
+            <input type="range" name="study_hours" min="0" max="14" step="0.5" value="{{ record.study_hours if record else 4.0 }}" data-val />
+            <span class="range-val">{{ record.study_hours if record else 4.0 }}</span>
+          </div>
+        </div>
+        <div class="field">
+          <label>运动时长 <span class="hint">小时</span></label>
+          <div class="range-wrap">
+            <input type="range" name="exercise_hours" min="0" max="6" step="0.5" value="{{ record.exercise_hours if record else 0.5 }}" data-val />
+            <span class="range-val">{{ record.exercise_hours if record else 0.5 }}</span>
+          </div>
+        </div>
+        <div class="field">
+          <label>娱乐时长 <span class="hint">小时</span></label>
+          <div class="range-wrap">
+            <input type="range" name="entertainment_hours" min="0" max="12" step="0.5" value="{{ record.entertainment_hours if record else 2.0 }}" data-val />
+            <span class="range-val">{{ record.entertainment_hours if record else 2.0 }}</span>
+          </div>
+        </div>
+        <div class="field">
+          <label>社交次数 <span class="hint">次</span></label>
+          <input type="number" name="social_count" min="0" max="100" value="{{ record.social_count if record else 0 }}" />
+        </div>
+        <div class="field">
+          <label>消费金额 <span class="hint">元</span></label>
+          <input type="number" name="spending" min="0" step="0.01" value="{{ record.spending if record else 0 }}" />
+        </div>
+        <div class="field">
+          <label>心情评分 <span class="hint">1–10</span></label>
+          <div class="range-wrap">
+            <input type="range" name="mood" min="1" max="10" step="1" value="{{ record.mood if record else 6 }}" data-val />
+            <span class="range-val">{{ record.mood if record else 6 }}</span>
+          </div>
+        </div>
+        <div class="field">
+          <label>压力评分 <span class="hint">1–10</span></label>
+          <div class="range-wrap">
+            <input type="range" name="stress" min="1" max="10" step="1" value="{{ record.stress if record else 5 }}" data-val />
+            <span class="range-val">{{ record.stress if record else 5 }}</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="row" style="gap:22px;margin-bottom:16px;">
+        <label style="display:flex;align-items:center;gap:8px;font-weight:600;">
+          <input type="checkbox" name="stay_up_late" {{ 'checked' if record and record.stay_up_late else '' }} style="width:16px;height:16px;accent-color:#4f46e5;" /> 是否熬夜
+        </label>
+        <label style="display:flex;align-items:center;gap:8px;font-weight:600;">
+          <input type="checkbox" name="plan_completed" {{ 'checked' if record and record.plan_completed else '' }} style="width:16px;height:16px;accent-color:#10b981;" /> 是否完成当天计划
+        </label>
+        <div class="field" style="margin:0;flex-direction:row;align-items:center;gap:8px;">
+          <label style="margin:0;">天气</label>
+          <select name="weather" style="width:auto;min-width:110px;">
+            {% set w = record.weather if record else '晴' %}
+            {% for opt in ['晴','多云','阴','小雨','大雨','雪'] %}
+            <option value="{{ opt }}" {{ 'selected' if w == opt else '' }}>{{ opt }}</option>
+            {% endfor %}
+          </select>
+        </div>
+      </div>
+
+      <div class="field">
+        <label>备注</label>
+        <textarea name="note" placeholder="记录今天想记住的事…">{{ record.note if record else '' }}</textarea>
+      </div>
+
+      <input type="hidden" name="date" value="{{ target_date }}" />
+      <div class="row">
+        <button type="submit" class="btn primary">保存今日数据</button>
+        <a href="/" class="btn ghost">返回概览</a>
+      </div>
+    </form>
+
+    <div>
+      <div class="card">
+        <div class="card-title">提示</div>
+        <p class="small muted" style="margin:0;">
+          数据会自动保存。第二天可以回来继续修改——同一日期的新记录会覆盖旧记录。
+        </p>
+      </div>
+      <div class="card" style="margin-top:18px;">
+        <div class="card-title">为什么记录这些</div>
+        <p class="small muted" style="margin:0;">
+          这些看似零散的字段组合起来，就能通过统计方法揭示你的生活规律：睡眠如何影响心情、
+          学习时长与压力的关系、以及哪些日子是「高效率日」。
+        </p>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+  document.querySelectorAll('input[type="range"][data-val]').forEach(function (r) {
+    var out = r.parentElement.querySelector('.range-val');
+    r.addEventListener('input', function () { out.textContent = r.value; });
+  });
+
+  document.getElementById('record-form').addEventListener('submit', async function (e) {
+    e.preventDefault();
+    var f = e.target;
+    var payload = {
+      date: f.date.value,
+      sleep_hours: parseFloat(f.sleep_hours.value),
+      study_hours: parseFloat(f.study_hours.value),
+      exercise_hours: parseFloat(f.exercise_hours.value),
+      entertainment_hours: parseFloat(f.entertainment_hours.value),
+      social_count: parseInt(f.social_count.value || 0, 10),
+      spending: parseFloat(f.spending.value || 0),
+      mood: parseInt(f.mood.value, 10),
+      stress: parseInt(f.stress.value, 10),
+      stay_up_late: f.stay_up_late.checked,
+      plan_completed: f.plan_completed.checked,
+      note: f.note.value,
+      weather: f.weather.value
+    };
+    try {
+      var res = await fetch('/api/records', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+      var data = await res.json();
+      if (res.ok) {
+        LifeTrace.toast('已保存 ' + payload.date + ' 的数据 ✓');
+      } else {
+        LifeTrace.toast('保存失败：' + (data.detail || '未知错误'));
+      }
+    } catch (err) {
+      LifeTrace.toast('保存失败：' + err.message);
+    }
+  });
+</script>
+{% endblock %}

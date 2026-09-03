@@ -1,0 +1,53 @@
+{% extends "base.html" %}
+{% block title %}LifeTrace · 记录列表{% endblock %}
+
+{% block content %}
+<header class="topbar">
+  <div>
+    <h1>记录列表</h1>
+    <div class="meta">共 {{ records | length }} 条记录</div>
+  </div>
+  <a href="/record" class="btn primary">+ 新增记录</a>
+</header>
+
+<div class="content">
+  <div class="card" style="padding:0;overflow:hidden;">
+    <table class="table">
+      <thead>
+        <tr>
+          <th>日期</th>
+          <th class="num">睡眠</th>
+          <th class="num">学习</th>
+          <th class="num">运动</th>
+          <th class="num">社交</th>
+          <th class="num">消费</th>
+          <th class="num">心情</th>
+          <th class="num">压力</th>
+          <th>熬夜</th>
+          <th>完成计划</th>
+          <th>天气</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for r in records %}
+        <tr>
+          <td class="mono">{{ r.date }}</td>
+          <td class="num">{{ r.sleep_hours }}h</td>
+          <td class="num">{{ r.study_hours }}h</td>
+          <td class="num">{{ r.exercise_hours }}h</td>
+          <td class="num">{{ r.social_count }}</td>
+          <td class="num">¥{{ '%.0f' | format(r.spending) }}</td>
+          <td class="num">{{ r.mood }}</td>
+          <td class="num">{{ r.stress }}</td>
+          <td>{% if r.stay_up_late %}<span class="badge red">熬夜</span>{% else %}<span class="badge gray">—</span>{% endif %}</td>
+          <td>{% if r.plan_completed %}<span class="badge green">完成</span>{% else %}<span class="badge gray">未完成</span>{% endif %}</td>
+          <td>{{ r.weather }}</td>
+          <td><a href="/record?day={{ r.date }}">编辑</a></td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

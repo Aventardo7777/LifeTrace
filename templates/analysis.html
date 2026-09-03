@@ -1,0 +1,305 @@
+{% extends "base.html" %}
+{% block title %}LifeTrace · 分析{% endblock %}
+
+{% block content %}
+<header class="topbar">
+  <div>
+    <h1>分析</h1>
+    <div class="meta">统计方法驱动的行为洞察 · 基于 {{ n }} 天数据</div>
+  </div>
+  <a href="/" class="btn ghost">← 返回概览</a>
+</header>
+
+<div class="content">
+
+  <!-- 1. Correlation -->
+  <section class="section">
+    <div class="section-head">
+      <h3>相关性分析</h3>
+      <span class="desc">Pearson 相关系数 r（-1 ~ 1），含显著性检验 p 值</span>
+    </div>
+    <div class="grid" style="grid-template-columns: 320px 1fr;">
+      <div class="card" style="padding:14px;">
+        {% for c in correlation_pairs %}
+        <button class="corr-pair" style="width:100%;border:1px solid var(--border);background:var(--surface);font-family:inherit;margin-bottom:8px;"
+          onclick="loadScatter('{{ c.x }}', '{{ c.y }}')">
+          <span class="names">{{ c.x_label }} × {{ c.y_label }}</span>
+          <span style="display:flex;align-items:center;gap:8px;">
+            <span class="r" style="color:{{ '#10b981' if c.r >= 0 else '#ef4444' }};">{{ '%.2f' | format(c.r) }}</span>
+            <span class="p">p={{ '%.3f' | format(c.p) }}</span>
+          </span>
+        </button>
+        {% endfor %}
+        <div class="small muted" style="margin-top:6px;">点击上方任意组合，下方散点图即时更新（含线性趋势线）。</div>
+      </div>
+      <div class="card">
+        <div class="card-title">散点图 <span class="sub" id="scatter-title">睡眠 × 心情</span></div>
+        <div id="chart-scatter" class="chart chart-box"></div>
+      </div>
+    </div>
+
+    <div class="card" style="margin-top:18px;">
+      <div class="card-title">相关性热力图</div>
+      <div id="chart-heatmap" class="chart" style="min-height:380px;"></div>
+    </div>
+  </section>
+
+  <!-- 2. Time series -->
+  <section class="section">
+    <div class="section-head">
+      <h3>时间序列分析</h3>
+      <span class="desc">日 / 周 / 月粒度，含 7 日移动平均</span>
+    </div>
+    <div class="card">
+      <div class="row" style="margin-bottom:14px;">
+        <select id="ts-metric" style="width:auto;" onchange="loadTimeseries()">
+          {% for key, m in metrics.items() %}
+          <option value="{{ key }}">{{ m.label }}</option>
+          {% endfor %}
+        </select>
+        <select id="ts-gran" style="width:auto;" onchange="loadTimeseries()">
+          <option value="day">按日</option>
+          <option value="week">按周</option>
+          <option value="month">按月</option>
+        </select>
+      </div>
+      <div id="chart-timeseries" class="chart chart-box"></div>
+    </div>
+  </section>
+
+  <!-- 3. Anomaly -->
+  <section class="section">
+    <div class="section-head">
+      <h3>异常检测</h3>
+      <span class="desc">Isolation Forest + 单指标统计偏差（较过去 30 天）</span>
+    </div>
+    <div class="grid" style="grid-template-columns: 1fr 340px;">
+      <div class="card">
+        <div class="card-title">异常日期时间轴 <span class="sub">红 × 为异常日</span></div>
+        <div id="chart-anomaly" class="chart chart-box"></div>
+      </div>
+      <div class="card">
+        <div class="card-title">检测结果 <span class="sub">{{ anomalies | length }} 个异常日</span></div>
+        <div style="max-height:300px;overflow:auto;">
+        {% for a in anomalies[:12] %}
+          <div class="alert red" style="margin-bottom:8px;align-items:flex-start;">
+            <span class="icon">!</span>
+            <div>
+              <strong>{{ a.date }}</strong>
+              {% if a.driver %}<div class="small" style="margin-top:2px;">{{ a.driver.explanation }}</div>{% endif %}
+            </div>
+          </div>
+        {% else %}
+          <div class="alert green"><span class="icon">✓</span><div>数据不足或未发现明显异常日。</div></div>
+        {% endfor %}
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 4. Clustering -->
+  <section class="section">
+    <div class="section-head">
+      <h3>生活模式聚类</h3>
+      <span class="desc">K-Means（最佳 k 由轮廓系数决定）· 类别名称由数据特征自动生成</span>
+    </div>
+    <div class="grid" style="grid-template-columns: 1fr 1fr;">
+      <div class="card">
+        <div class="card-title">聚类投影 <span class="sub">PCA 二维投影</span></div>
+        <div id="chart-cluster" class="chart chart-box"></div>
+      </div>
+      <div class="card">
+        <div class="card-title">生活模式类别 <span class="sub">k={{ clusters.k }}{% if clusters.silhouette %} · 轮廓系数 {{ clusters.silhouette }}{% endif %}</span></div>
+        {% for c in clusters.clusters %}
+        <div class="compare-item" style="margin-bottom:10px;">
+          <div class="row spread">
+            <strong>{{ c.name }}</strong>
+            <span class="badge violet">{{ c.size }} 天 · {{ c.pct }}%</span>
+          </div>
+          <div class="small muted" style="margin-top:4px;">
+            {% for f, v in c.means.items() %}
+              {{ c.feature_labels[f] }} {{ v }}{% if not loop.last %} · {% endif %}
+            {% endfor %}
+          </div>
+        </div>
+        {% else %}
+        <div class="alert amber"><span class="icon">●</span><div>{{ clusters.message }}</div></div>
+        {% endfor %}
+      </div>
+    </div>
+  </section>
+
+  <!-- 5. Efficiency model -->
+  <section class="section">
+    <div class="section-head">
+      <h3>个人效率模型</h3>
+      <span class="desc">线性回归 · 预测当天「状态评分」（以心情评分 1–10 为代理）</span>
+    </div>
+    <div class="grid" style="grid-template-columns: 1fr 1fr;">
+      <div class="card">
+        {% if efficiency.trained %}
+        <div class="grid grid-3" style="margin-bottom:16px;">
+          <div class="kpi"><span class="label">训练 R²</span><span class="value">{{ efficiency.r2_train }}</span></div>
+          <div class="kpi"><span class="label">测试 R²</span><span class="value">{{ efficiency.r2_test }}</span></div>
+          <div class="kpi"><span class="label">平均绝对误差</span><span class="value">{{ efficiency.mae }}</span></div>
+        </div>
+        <div class="card-title">特征重要性 <span class="sub">标准化系数（正→提升，负→降低）</span></div>
+        <div id="chart-importance" class="chart" style="min-height:260px;"></div>
+        {% else %}
+        <div class="alert amber"><span class="icon">●</span><div>{{ efficiency.message }}</div></div>
+        {% endif %}
+        <div class="alert blue" style="margin-top:14px;">
+          <span class="icon">i</span>
+          <div>这是<strong>统计模型</strong>，不是心理或医学诊断。结果仅反映你自己历史数据中的统计关联。</div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-title">预测你的状态评分</div>
+        <form id="predict-form">
+          {% set feats = [
+            ('sleep_hours','睡眠','小时',7.0),('study_hours','学习','小时',5.0),
+            ('exercise_hours','运动','小时',0.5),('social_count','社交次数','次',1),
+            ('entertainment_hours','娱乐','小时',2.0),('stress','压力','分',5)
+          ] %}
+          {% for key, label, unit, val in feats %}
+          <div class="field">
+            <label>{{ label }} <span class="hint">{{ unit }}</span></label>
+            <input type="number" step="0.5" name="{{ key }}" value="{{ val }}" />
+          </div>
+          {% endfor %}
+          <div class="field">
+            <label style="display:flex;align-items:center;gap:8px;">
+              <input type="checkbox" name="stay_up_late" value="1" style="width:16px;height:16px;accent-color:#4f46e5;" /> 是否熬夜
+            </label>
+          </div>
+          <button type="submit" class="btn primary">预测</button>
+        </form>
+        <div id="predict-result" style="margin-top:16px;"></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 6. What-if -->
+  <section class="section">
+    <div class="section-head">
+      <h3>如果我改变一个变量，会发生什么？</h3>
+      <span class="desc">基于历史「相似日期」的匹配估计</span>
+    </div>
+    <div class="card">
+      <form id="whatif-form" class="row" style="align-items:flex-end;">
+        <div class="field" style="margin:0;">
+          <label>变量</label>
+          <select id="wf-feature" style="width:auto;min-width:150px;">
+            {% for f in modifiable %}
+            <option value="{{ f }}">{{ metrics[f].label }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="field" style="margin:0;">
+          <label>当前值</label>
+          <input type="number" step="0.5" id="wf-current" value="5" style="width:110px;" />
+        </div>
+        <div class="field" style="margin:0;">
+          <label>目标值</label>
+          <input type="number" step="0.5" id="wf-target" value="7" style="width:110px;" />
+        </div>
+        <button type="submit" class="btn primary">模拟</button>
+      </form>
+
+      <div id="whatif-result" style="margin-top:20px;">
+        <div class="small muted">例如：把「睡眠」从 5 小时提高到 7 小时，看看历史数据中相似的日子表现如何。</div>
+      </div>
+    </div>
+  </section>
+
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+  window.__CHARTS__ = {
+    scatter: {{ charts.scatter | safe }},
+    timeseries: {{ charts.timeseries | safe }},
+    heatmap: {{ charts.heatmap | safe }},
+    cluster: {{ charts.cluster | safe }},
+    anomaly: {{ charts.anomaly | safe }},
+    importance: {{ charts.importance | safe }}
+  };
+  LifeTrace.renderCharts();
+
+  var LABELS = {{ metrics | tojson }};
+
+  async function loadScatter(x, y) {
+    var res = await fetch('/api/analysis/scatter?x=' + x + '&y=' + y);
+    var data = await res.json();
+    LifeTrace.renderChart('chart-scatter', JSON.parse(data.chart));
+    document.getElementById('scatter-title').textContent =
+      (LABELS[x] ? LABELS[x].label : x) + ' × ' + (LABELS[y] ? LABELS[y].label : y);
+  }
+
+  async function loadTimeseries() {
+    var metric = document.getElementById('ts-metric').value;
+    var gran = document.getElementById('ts-gran').value;
+    var res = await fetch('/api/analysis/timeseries?metric=' + metric + '&granularity=' + gran);
+    var data = await res.json();
+    LifeTrace.renderChart('chart-timeseries', JSON.parse(data.chart));
+  }
+
+  document.getElementById('predict-form').addEventListener('submit', async function (e) {
+    e.preventDefault();
+    var f = e.target;
+    var q = new URLSearchParams();
+    q.set('sleep_hours', f.sleep_hours.value);
+    q.set('study_hours', f.study_hours.value);
+    q.set('exercise_hours', f.exercise_hours.value);
+    q.set('social_count', f.social_count.value);
+    q.set('entertainment_hours', f.entertainment_hours.value);
+    q.set('stress', f.stress.value);
+    q.set('stay_up_late', f.stay_up_late.checked ? '1' : '0');
+    var res = await fetch('/api/analysis/efficiency/predict?' + q.toString());
+    var data = await res.json();
+    var el = document.getElementById('predict-result');
+    if (data.predicted !== undefined) {
+      var top = data.contributions.slice(0, 3).map(function (c) {
+        return c.label + ' ' + (c.contribution >= 0 ? '+' : '') + c.contribution;
+      }).join(' · ');
+      el.innerHTML =
+        '<div class="alert green"><span class="icon">✓</span><div>' +
+        '<strong>预测状态评分：' + data.predicted_clamped + ' / 10</strong>' +
+        '<div class="small" style="margin-top:4px;">历史均值 ' + data.baseline_mean +
+        ' · 主要影响因素：' + top + '</div></div></div>' +
+        '<div class="small muted" style="margin-top:8px;">' + data.note + '</div>';
+    } else {
+      el.innerHTML = '<div class="alert amber"><span class="icon">●</span><div>' + (data.detail || '数据不足') + '</div></div>';
+    }
+  });
+
+  document.getElementById('whatif-form').addEventListener('submit', async function (e) {
+    e.preventDefault();
+    var feature = document.getElementById('wf-feature').value;
+    var current = document.getElementById('wf-current').value;
+    var target = document.getElementById('wf-target').value;
+    var res = await fetch('/api/analysis/whatif?feature=' + feature + '&current=' + current + '&target=' + target);
+    var data = await res.json();
+    var el = document.getElementById('whatif-result');
+    if (data.error) {
+      el.innerHTML = '<div class="alert amber"><span class="icon">●</span><div>' + data.error + '</div></div>';
+      return;
+    }
+    var items = data.outcomes.map(function (o) {
+      var dirColor = o.direction === '上升' ? 'var(--green)' : (o.direction === '下降' ? 'var(--red)' : 'var(--muted)');
+      var pct = (o.pct >= 0 ? '+' : '') + o.pct + '%';
+      return '<div class="compare-item"><div class="l">' + o.label + '</div>' +
+        '<div class="b">' + o.baseline + ' <span style="font-size:13px;color:var(--muted-2)">→</span> ' + o.counterfactual + '</div>' +
+        '<div class="a" style="color:' + dirColor + '">' + o.direction + ' ' + pct + '</div></div>';
+    }).join('');
+    el.innerHTML =
+      '<div class="compare-grid">' + items + '</div>' +
+      '<div style="margin-top:16px;" id="chart-whatif" class="chart" style="min-height:280px;"></div>' +
+      '<div class="alert blue" style="margin-top:12px;"><span class="icon">i</span><div>' + data.disclaimer + '</div></div>' +
+      '<div class="small muted" style="margin-top:8px;">匹配样本：当前 ' + data.baseline_n + ' 天 · 目标 ' + data.counterfactual_n + ' 天</div>';
+    LifeTrace.renderChart('chart-whatif', JSON.parse(data.chart));
+  });
+</script>
+{% endblock %}

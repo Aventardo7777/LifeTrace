@@ -1,0 +1,83 @@
+{% extends "base.html" %}
+{% block title %}LifeTrace · 数据{% endblock %}
+
+{% block content %}
+<header class="topbar">
+  <div>
+    <h1>数据</h1>
+    <div class="meta">导入、导出与备份你的数据</div>
+  </div>
+</header>
+
+<div class="content">
+  <div class="grid grid-3">
+    <div class="card">
+      <div class="card-title">CSV 导入</div>
+      <p class="small muted">上传 CSV 文件，自动识别中文 / 英文字段名，按日期合并（同日期覆盖）。</p>
+      <input type="file" id="csv-file" accept=".csv" style="margin-bottom:12px;" />
+      <button class="btn primary" id="btn-import">导入 CSV</button>
+      <div id="import-result" class="small muted" style="margin-top:10px;"></div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">导出</div>
+      <p class="small muted">导出全部记录为 CSV（Excel 可直接打开）或 JSON。</p>
+      <div class="row">
+        <a href="/api/export/csv" class="btn">导出 CSV</a>
+        <a href="/api/export/json" class="btn">导出 JSON</a>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">数据库备份</div>
+      <p class="small muted">下载当前 SQLite 数据库文件的完整备份。</p>
+      <a href="/api/backup" class="btn">下载备份</a>
+    </div>
+  </div>
+
+  <div class="card" style="margin-top:18px;">
+    <div class="card-title">CSV 格式说明</div>
+    <p class="small muted" style="margin:0;">
+      必需列：<code class="mono">date</code>（或「日期」，格式 YYYY-MM-DD）。
+      可选列：<code class="mono">sleep_hours, study_hours, exercise_hours, entertainment_hours,
+      social_count, spending, mood, stress, stay_up_late, plan_completed, note, weather</code>，
+      均支持对应的中文列名（如「睡眠」「学习」「心情」「压力」）。
+    </p>
+  </div>
+
+  <div class="card" style="margin-top:18px;">
+    <div class="card-title">隐私说明</div>
+    <p class="small muted" style="margin:0;">
+      默认情况下，所有数据仅保存在本机 <code class="mono">data/lifetrace.db</code>（SQLite）。
+      本项目不需要账号、不上传任何个人生活数据、不连接云端数据库。
+    </p>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+  document.getElementById('btn-import').addEventListener('click', async function () {
+    var fileInput = document.getElementById('csv-file');
+    var out = document.getElementById('import-result');
+    if (!fileInput.files.length) { LifeTrace.toast('请先选择 CSV 文件'); return; }
+    var form = new FormData();
+    form.append('file', fileInput.files[0]);
+    out.textContent = '导入中…';
+    try {
+      var res = await fetch('/api/import/csv', { method: 'POST', body: form });
+      var data = await res.json();
+      if (data.ok) {
+        out.textContent = '完成：新增 ' + data.created + ' 条，更新 ' + data.updated + ' 条' +
+          (data.skipped ? '，跳过 ' + data.skipped + ' 条' : '');
+        LifeTrace.toast('导入完成');
+      } else {
+        out.textContent = '导入失败：' + data.error;
+        LifeTrace.toast('导入失败');
+      }
+    } catch (err) {
+      out.textContent = '导入失败：' + err.message;
+    }
+  });
+</script>
+{% endblock %}
